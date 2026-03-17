@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrenchPass Dashboard</title>
+    <style>
+        body { background-color: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 600px; margin: 0 auto; }
+        input { width: 100%; padding: 15px; margin: 20px 0; border: 1px solid #333; border-radius: 8px; background: #1a1a1a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #00ff41; border: none; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; }
+        .card { background: #1a1a1a; padding: 15px; margin: 10px 0; border-radius: 12px; text-align: left; }
+        .pill { background: #333; padding: 5px 10px; border-radius: 20px; font-size: 0.8em; margin-right: 5px; }
+        .score-green { color: #00ff41; }
+        .score-amber { color: #ffbf00; }
+        .score-red { color: #ff4d4d; }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div id="login-view">
+            <h1>Enter your TrenchPass key</h1>
+            <input type="text" id="api-key" placeholder="Enter Key">
+            <button onclick="login()">Enter the Trenches</button>
+        </div>
+        <div id="dash-view" style="display:none;">
+            <h1>The Trenches 🔥</h1>
+            <p id="timestamp"></p>
+            <button onclick="scan()">Scan Now</button>
+            <div id="results"></div>
+            <p><a href="#" onclick="logout()" style="color: #666;">Logout</a></p>
+        </div>
+    </div>
+    <script>
+        const GATEWAY_URL = 'https://commercial-carlos-nails-instance.trycloudflare.com';
+        
+        function login() {
+            localStorage.setItem('tp-key', document.getElementById('api-key').value);
+            showDash();
+        }
+        
+        function logout() {
+            localStorage.removeItem('tp-key');
+            document.getElementById('login-view').style.display = 'block';
+            document.getElementById('dash-view').style.display = 'none';
+        }
+        
+        function showDash() {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('dash-view').style.display = 'block';
+        }
+
+        async function scan() {
+            const key = localStorage.getItem('tp-key');
+            const res = await fetch(`${GATEWAY_URL}/scan/hot?chains=solana&limit=5`, { headers: { 'api-key': key } });
+            const data = await res.json();
+            const container = document.getElementById('results');
+            container.innerHTML = '';
+            document.getElementById('timestamp').innerText = 'Last updated: ' + new Date().toLocaleTimeString();
+            data.forEach(token => {
+                let color = 'score-red';
+                if(token.score >= 80) color = 'score-green';
+                else if(token.score >= 60) color = 'score-amber';
+                
+                container.innerHTML += `
+                    <div class="card">
+                        <div style="font-size: 1.2em; font-weight: bold;">${token.name} (${token.ticker})</div>
+                        <div class="${color}">Score: ${token.score}/100</div>
+                        <div>24h Change: ${token.change}%</div>
+                        <div style="margin: 10px 0;">${token.summary}</div>
+                        <div>${token.tags.map(t => `<span class="pill">${t}</span>`).join('')}</div>
+                    </div>
+                `;
+            });
+        }
+
+        if(localStorage.getItem('tp-key')) showDash();
+    </script>
+</body>
+</html>
