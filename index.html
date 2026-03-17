@@ -15,10 +15,12 @@
         .score-amber { color: #ffbf00; }
         .score-red { color: #ff4d4d; }
         .ai-comment { color: #888; font-style: italic; font-size: 0.9em; margin-top: 8px; display: block; }
+        .btn { display: inline-block; background: #22c55e; color: #000; font-size: 1rem; font-weight: 700; padding: 1rem 1.5rem; border-radius: 8px; text-decoration: none; margin: 10px 0; }
     </style>
 </head>
 <body>
     <div class="container" id="app">
+        <a href="https://t.me/trenchpass" style="position:fixed; bottom:10px; right:10px; color:#666; font-size:0.8em; text-decoration: none;">Need help? DM @trenchpass</a>
         <div id="login-view">
             <h1>Enter your TrenchPass key</h1>
             <input type="text" id="api-key" placeholder="Enter Key">
@@ -30,6 +32,21 @@
             <button onclick="scan()">Scan Now</button>
             <div id="results"></div>
             <p><a href="#" onclick="logout()" style="color: #666;">Logout</a></p>
+        </div>
+        <div id="topup-view" style="display:none;">
+            <h1>You're out of credits 😅</h1>
+            <p>Current balance: 0 credits</p>
+            <div class="card">
+                <h3>Option 1 — Buy more</h3>
+                <a class="btn" href="https://moonpay.hel.io/pay/69b8b1eada8466b3b7fa0f38">Top Up — +36 lines0 for 500 credits</a>
+            </div>
+            <div class="card">
+                <h3>Option 2 — Direct SOL</h3>
+                <p>Or send 0.25 SOL directly to:</p>
+                <code style="display:block; margin:10px 0; background:#333; padding:10px; word-break: break-all;">56uRXxdFZb4SqsuqJZ6M43v2sSPmg1EEpGZ1FcrMd9W1</code>
+                <p style="font-size:0.8em; color:#888;">Then DM @trenchpass on X or Telegram with your wallet and tx signature</p>
+            </div>
+            <button onclick="document.getElementById('topup-view').style.display='none'; document.getElementById('dash-view').style.display='block';">Back</button>
         </div>
     </div>
     <script>
@@ -53,15 +70,12 @@
 
         async function getCommentary(token) {
             try {
-                const response = await fetch(`${GATEWAY_URL}/ai/comment`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'api-key': localStorage.getItem('tp-key') },
-                    body: JSON.stringify({
-                        prompt: `You are TrenchPass, a Solana signal service. In ONE sentence, explain this token signal to someone who has never traded crypto before. Be helpful, slightly hyped, use casual language. Do not use technical jargon. Token: ${token.ticker}, Score: ${token.score}/100, 24h change: ${token.change}%. Keep it under 20 words.`
-                    })
+                const response = await fetch(`${GATEWAY_URL}/ai/comment?symbol=${token.ticker}&score=${token.score}&change=${token.change}&tags=${token.tags.join(',')}`, {
+                    method: 'GET',
+                    headers: { 'api-key': localStorage.getItem('tp-key') }
                 });
                 const data = await response.json();
-                return data.commentary;
+                return data.comment;
             } catch (e) {
                 return '';
             }
@@ -70,12 +84,19 @@
         async function scan() {
             const key = localStorage.getItem('tp-key');
             const res = await fetch(`${GATEWAY_URL}/scan/hot?chains=solana&limit=5`, { headers: { 'api-key': key } });
+            
+            if (res.status === 402) {
+                document.getElementById('dash-view').style.display = 'none';
+                document.getElementById('topup-view').style.display = 'block';
+                return;
+            }
+            
             const data = await res.json();
             const container = document.getElementById('results');
             container.innerHTML = '';
             document.getElementById('timestamp').innerText = 'Last updated: ' + new Date().toLocaleTimeString();
             
-            for (const token of data) {
+            for (const token of data.results) {
                 let color = 'score-red';
                 if(token.score >= 80) color = 'score-green';
                 else if(token.score >= 60) color = 'score-amber';
@@ -84,10 +105,10 @@
                 
                 container.innerHTML += `
                     <div class="card">
-                        <div style="font-size: 1.2em; font-weight: bold;">${token.name} (${token.ticker})</div>
+                        <div style="font-size: 1.2em; font-weight: bold;">${token.tokenName} (${token.tokenSymbol})</div>
                         <div class="${color}">Score: ${token.score}/100</div>
-                        <div>24h Change: ${token.change}%</div>
-                        <div style="margin: 10px 0;">${token.summary}</div>
+                        <div>24h Change: ${token.priceChangeH24}%</div>
+                        <div style="margin: 10px 0;">${token.summary || ''}</div>
                         <div>${token.tags.map(t => `<span class="pill">${t}</span>`).join('')}</div>
                         ${commentary ? `<span class="ai-comment">"${commentary}"</span>` : ''}
                     </div>
